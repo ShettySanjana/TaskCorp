@@ -1,4 +1,4 @@
-import { Pencil, Trash2, CalendarDays } from "lucide-react";
+import { Pencil, Trash2, CalendarDays, MessageSquare } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import PriorityBadge from "./PriorityBadge";
 import UserAvatar from "./UserAvatar";
@@ -11,8 +11,8 @@ interface Props {
   onEdit?: (t: Task) => void;
   onDelete?: (id: string) => void;
   onStatusChange?: (id: string, status: TaskStatus) => void;
+  onRowClick?: (t: Task) => void;
   showAssignee?: boolean;
-  compact?: boolean;
 }
 
 const isOverdue = (t: Task) =>
@@ -23,6 +23,7 @@ export default function TaskTable({
   onEdit,
   onDelete,
   onStatusChange,
+  onRowClick,
   showAssignee = true,
 }: Props) {
   return (
@@ -43,17 +44,36 @@ export default function TaskTable({
           <tbody>
             {tasks.map((t) => {
               const overdue = isOverdue(t);
+              const commentCount = t.comments?.length ?? 0;
+              const clickable = !!onRowClick;
               return (
-                <tr key={t.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
+                <tr
+                  key={t.id}
+                  onClick={() => onRowClick?.(t)}
+                  className={`border-t border-border transition-colors ${
+                    clickable ? "cursor-pointer hover:bg-secondary/40" : "hover:bg-secondary/30"
+                  }`}
+                >
                   <td className="px-5 py-4 max-w-sm">
-                    <p className="font-semibold text-foreground">{t.name}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{t.description}</p>
-                    <span className="inline-block mt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {t.category}
-                    </span>
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground">{t.name}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{t.description}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {t.category}
+                          </span>
+                          {commentCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <MessageSquare className="w-3 h-3" /> {commentCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-4"><PriorityBadge priority={t.priority} /></td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                     {onStatusChange ? (
                       <Select value={t.status} onValueChange={(v) => onStatusChange(t.id, v as TaskStatus)}>
                         <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
@@ -79,7 +99,7 @@ export default function TaskTable({
                     <ProgressBar value={t.progress ?? 0} tone={t.status === "Completed" ? "completed" : "primary"} />
                     <span className="text-[10px] text-muted-foreground mt-1 inline-block">{t.progress ?? 0}%</span>
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="inline-flex gap-1">
                       {onEdit && (
                         <button
