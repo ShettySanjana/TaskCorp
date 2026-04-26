@@ -2,95 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* TaskCorp design system — corporate indigo + teal, semantic tokens, HSL only */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 30% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 231 70% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 231 90% 70%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 25% 95%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 220 12% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 174 62% 47%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 78% 58%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 20% 90%;
+    --input: 220 20% 90%;
+    --ring: 231 70% 56%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Status palette */
+    --status-pending: 32 95% 54%;
+    --status-pending-bg: 32 100% 95%;
+    --status-progress: 213 92% 55%;
+    --status-progress-bg: 213 100% 95%;
+    --status-completed: 152 65% 42%;
+    --status-completed-bg: 152 70% 93%;
+    --status-blocked: 0 78% 58%;
+    --status-blocked-bg: 0 90% 96%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Priority palette */
+    --priority-low: 220 12% 50%;
+    --priority-medium: 213 92% 55%;
+    --priority-high: 32 95% 54%;
+    --priority-critical: 0 78% 58%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Sidebar */
+    --sidebar-background: 226 56% 14%;
+    --sidebar-foreground: 220 25% 88%;
+    --sidebar-primary: 231 90% 70%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 226 50% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 226 40% 22%;
+    --sidebar-ring: 231 90% 70%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Effects */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+    --gradient-banner: linear-gradient(135deg, hsl(231 70% 56% / 0.08) 0%, hsl(174 62% 47% / 0.08) 100%);
+    --shadow-card: 0 1px 2px hsl(222 47% 11% / 0.04), 0 4px 16px hsl(222 47% 11% / 0.04);
+    --shadow-elevated: 0 8px 30px hsl(231 70% 56% / 0.18);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 226 40% 8%;
+    --foreground: 220 25% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 226 40% 12%;
+    --card-foreground: 220 25% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 226 40% 12%;
+    --popover-foreground: 220 25% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 231 90% 70%;
+    --primary-foreground: 226 40% 8%;
+    --primary-glow: 231 100% 78%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 226 30% 18%;
+    --secondary-foreground: 220 25% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 226 30% 16%;
+    --muted-foreground: 220 15% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 174 62% 55%;
+    --accent-foreground: 226 40% 8%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 78% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 226 30% 20%;
+    --input: 226 30% 20%;
+    --ring: 231 90% 70%;
+
+    --status-pending-bg: 32 60% 18%;
+    --status-progress-bg: 213 60% 18%;
+    --status-completed-bg: 152 50% 15%;
+    --status-blocked-bg: 0 50% 18%;
+
+    --sidebar-background: 226 50% 10%;
+    --sidebar-foreground: 220 25% 88%;
+    --sidebar-primary: 231 90% 70%;
+    --sidebar-primary-foreground: 226 40% 8%;
+    --sidebar-accent: 226 40% 18%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 226 40% 18%;
+    --sidebar-ring: 231 90% 70%;
+
+    --gradient-banner: linear-gradient(135deg, hsl(231 70% 56% / 0.18) 0%, hsl(174 62% 47% / 0.18) 100%);
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.3), 0 4px 16px hsl(0 0% 0% / 0.3);
   }
 }
 
@@ -99,7 +125,28 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    @apply tracking-tight;
+  }
+}
+
+@layer components {
+  .card-elevated {
+    @apply bg-card rounded-xl border border-border;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-smooth);
+  }
+  .card-elevated:hover {
+    box-shadow: var(--shadow-elevated);
+    transform: translateY(-2px);
   }
 }
