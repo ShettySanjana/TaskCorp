@@ -1,64 +1,69 @@
 import { useMemo, useState } from "react";
-import { Plus, ListTodo, CheckCircle2, Clock, AlertOctagon, TrendingUp } from "lucide-react";
+import { Plus, ListTodo, CheckCircle2, Clock, AlertOctagon, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTasks } from "@/hooks/useTasks";
 import HeroBanner from "@/components/dashboard/HeroBanner";
 import StatCard from "@/components/dashboard/StatCard";
-import TaskFilters from "@/components/tasks/TaskFilters";
+import AnalyticsCharts from "@/components/dashboard/AnalyticsCharts";
+import TaskFilters, { type SortKey } from "@/components/tasks/TaskFilters";
 import TaskTable from "@/components/tasks/TaskTable";
 import TaskFormDialog from "@/components/tasks/TaskFormDialog";
+import TaskDetailDialog from "@/components/tasks/TaskDetailDialog";
 import EmptyState from "@/components/tasks/EmptyState";
-import ProgressBar from "@/components/tasks/ProgressBar";
 import { USERS } from "@/data/users";
-import type { Task, TaskStatus } from "@/types/task";
+import { useCurrentUser } from "@/context/CurrentUserContext";
+import { calculatePerformance } from "@/lib/scoring";
+import { sortTasks } from "@/lib/sort";
+import { exportTasksCSV, exportTasksPDF } from "@/lib/export";
+import type { Task } from "@/types/task";
 import { toast } from "sonner";
 
 export default function AdminDashboard() {
-  const { tasks, addTask, updateTask, deleteTask } = useTasks();
+  const { tasks, addTask, updateTask, deleteTask, addComment } = useTasks();
+  const { currentUserId } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
+
+  const [detail, setDetail] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [user, setUser] = useState("all");
+  const [sort, setSort] = useState<SortKey>("due-asc");
 
   const filtered = useMemo(() => {
-    return tasks.filter((t) => {
+    const list = tasks.filter((t) => {
       const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = status === "all" || t.status === status;
       const matchesPriority = priority === "all" || t.priority === priority;
       const matchesUser = user === "all" || t.assignedTo === user;
       return matchesSearch && matchesStatus && matchesPriority && matchesUser;
     });
-  }, [tasks, search, status, priority, user]);
+    return sortTasks(list, sort);
+  }, [tasks, search, status, priority, user, sort]);
 
   const total = tasks.length;
   const completed = tasks.filter((t) => t.status === "Completed").length;
   const pending = tasks.filter((t) => t.status === "Pending").length;
   const blocked = tasks.filter((t) => t.status === "Blocked").length;
-  const performance = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-  // simple status distribution
-  const dist = (["Pending", "In Progress", "Completed", "Blocked"] as TaskStatus[]).map((s) => ({
-    label: s,
-    count: tasks.filter((t) => t.status === s).length,
-  }));
 
   const handleSubmit = (data: Omit<Task, "id" | "createdAt"> & { id?: string }) => {
     if (data.id) {
       const { id, ...rest } = data;
-      updateTask(id, rest);
+      updateTask(id, rest, currentUserId);
       toast.success("Task updated");
     } else {
       const { id: _ignore, ...rest } = data;
-      addTask(rest);
+      addTask(rest, currentUserId);
       toast.success("Task created");
     }
   };
 
   const openCreate = () => { setEditing(null); setOpen(true); };
   const openEdit = (t: Task) => { setEditing(t); setOpen(true); };
+  const liveDetail = detail ? tasks.find((t) => t.id === detail.id) ?? null : null;
 
   return (
     <div className="space-y-8">
@@ -70,78 +75,77 @@ export default function AdminDashboard() {
         <Button size="lg" onClick={openCreate} className="shadow-elevated">
           <Plus className="w-4 h-4 mr-2" /> New task
         </Button>
-        <Button size="lg" variant="outline" onClick={() => { setStatus("Blocked"); }}>
+        <Button size="lg" variant="outline" onClick={() => setStatus("Blocked")}>
           <AlertOctagon className="w-4 h-4 mr-2" /> View blockers
         </Button>
       </HeroBanner>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total tasks" value={total} hint={`${USERS.length} active members`} icon={ListTodo} tone="primary" />
-        <StatCard label="Completed" value={completed} hint={`${performance}% performance`} icon={CheckCircle2} tone="completed" />
+        <StatCard label="Completed" value={completed} hint={`${total === 0 ? 0 : Math.round((completed / total) * 100)}% completion`} icon={CheckCircle2} tone="completed" />
         <StatCard label="Pending" value={pending} hint="Awaiting action" icon={Clock} tone="pending" />
         <StatCard label="Blocked" value={blocked} hint="Need unblocking" icon={AlertOctagon} tone="blocked" />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card-elevated p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-display text-lg font-semibold">Status distribution</h3>
-              <p className="text-xs text-muted-foreground">Live snapshot of all tasks across the workspace</p>
-            </div>
-            <TrendingUp className="w-5 h-5 text-primary" />
-          </div>
-          <div className="space-y-4">
-            {dist.map((d) => {
-              const pct = total === 0 ? 0 : Math.round((d.count / total) * 100);
-              const tone =
-                d.label === "Completed" ? "completed" : d.label === "Pending" ? "warning" : "primary";
-              return (
-                <div key={d.label}>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="font-medium">{d.label}</span>
-                    <span className="text-muted-foreground">{d.count} · {pct}%</span>
-                  </div>
-                  <ProgressBar value={pct} tone={tone as any} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      <AnalyticsCharts tasks={tasks} />
 
-        <div className="card-elevated p-6">
-          <h3 className="font-display text-lg font-semibold">Team workload</h3>
-          <p className="text-xs text-muted-foreground mb-4">Open tasks per member</p>
-          <div className="space-y-3">
-            {USERS.map((u) => {
-              const open = tasks.filter((t) => t.assignedTo === u.id && t.status !== "Completed").length;
-              return (
-                <div key={u.id} className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
-                    style={{ background: `hsl(${u.color})` }}
-                  >
-                    {u.initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">{u.role}</p>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums">{open}</span>
+      <section className="card-elevated p-6">
+        <h3 className="font-display text-lg font-semibold mb-1">Team performance leaderboard</h3>
+        <p className="text-xs text-muted-foreground mb-4">Weighted score factoring completion, overdue tasks, and task priority.</p>
+        <div className="space-y-3">
+          {USERS.map((u) => {
+            const ut = tasks.filter((t) => t.assignedTo === u.id);
+            const { score, completed: c, overdue: o, total: tot } = calculatePerformance(ut);
+            return (
+              <div key={u.id} className="flex items-center gap-4">
+                <div
+                  className="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                  style={{ background: `hsl(${u.color})` }}
+                >
+                  {u.initials}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <p className="text-sm font-semibold truncate">{u.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {c}/{tot} done · {o} overdue
+                      </p>
+                    </div>
+                    <span className={`font-display font-bold tabular-nums ${score >= 70 ? "text-status-completed" : score >= 40 ? "text-primary" : "text-status-pending"}`}>
+                      {score}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        score >= 70 ? "bg-status-completed" : score >= 40 ? "bg-primary" : "bg-status-pending"
+                      }`}
+                      style={{ width: `${score}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="font-display text-2xl font-semibold">All tasks</h2>
-            <p className="text-sm text-muted-foreground">Search, filter and manage every task in the workspace.</p>
+            <p className="text-sm text-muted-foreground">Search, filter, sort and manage every task in the workspace.</p>
           </div>
-          <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" /> New task</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => { exportTasksCSV(filtered); toast.success("CSV exported"); }}>
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" onClick={() => exportTasksPDF(filtered, "TaskCorp – Admin Report")}>
+              <FileText className="w-4 h-4 mr-2" /> PDF
+            </Button>
+            <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" /> New task</Button>
+          </div>
         </div>
 
         <TaskFilters
@@ -149,6 +153,7 @@ export default function AdminDashboard() {
           status={status} setStatus={setStatus}
           priority={priority} setPriority={setPriority}
           user={user} setUser={setUser}
+          sort={sort} setSort={setSort}
         />
 
         {filtered.length === 0 ? (
@@ -162,13 +167,24 @@ export default function AdminDashboard() {
           <TaskTable
             tasks={filtered}
             onEdit={openEdit}
+            onRowClick={(t) => { setDetail(t); setDetailOpen(true); }}
             onDelete={(id) => { deleteTask(id); toast.success("Task deleted"); }}
-            onStatusChange={(id, s) => updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any })}
+            onStatusChange={(id, s) => {
+              updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any }, currentUserId);
+              toast.success(`Status updated to ${s}`);
+            }}
           />
         )}
       </section>
 
       <TaskFormDialog open={open} onOpenChange={setOpen} initial={editing} onSubmit={handleSubmit} />
+      <TaskDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        task={liveDetail}
+        currentUserId={currentUserId}
+        onAddComment={(id, msg, author) => { addComment(id, msg, author); toast.success("Comment added"); }}
+      />
     </div>
   );
 }

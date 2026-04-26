@@ -1,45 +1,58 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, Clock, AlertOctagon, ListTodo, Bell } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { CheckCircle2, Clock, AlertOctagon, ListTodo, Bell, Download } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import HeroBanner from "@/components/dashboard/HeroBanner";
 import StatCard from "@/components/dashboard/StatCard";
-import TaskFilters from "@/components/tasks/TaskFilters";
+import TaskFilters, { type SortKey } from "@/components/tasks/TaskFilters";
 import TaskTable from "@/components/tasks/TaskTable";
+import TaskDetailDialog from "@/components/tasks/TaskDetailDialog";
 import EmptyState from "@/components/tasks/EmptyState";
 import ProgressBar from "@/components/tasks/ProgressBar";
+import { Button } from "@/components/ui/button";
 import { USERS } from "@/data/users";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCurrentUser } from "@/context/CurrentUserContext";
+import { calculatePerformance, isTaskOverdue } from "@/lib/scoring";
+import { sortTasks } from "@/lib/sort";
+import { exportTasksCSV } from "@/lib/export";
+import type { Task } from "@/types/task";
 import { toast } from "sonner";
 
 export default function EmployeeDashboard() {
-  const { tasks, updateTask } = useTasks();
-  const [userId, setUserId] = useState(USERS[0].id);
-  const me = USERS.find((u) => u.id === userId)!;
+  const { tasks, updateTask, addComment } = useTasks();
+  const { currentUserId, setCurrentUserId, isAdmin } = useCurrentUser();
+
+  // If admin is selected globally, default the employee view to first member
+  const employeeId = isAdmin ? USERS[0].id : currentUserId;
+  const me = USERS.find((u) => u.id === employeeId) ?? USERS[0];
+
+  // Sync the global switcher when a real employee is chosen here
+  useEffect(() => {
+    if (!isAdmin && currentUserId !== me.id) setCurrentUserId(me.id);
+  }, [me.id, isAdmin, currentUserId, setCurrentUserId]);
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
+  const [sort, setSort] = useState<SortKey>("priority");
 
-  const myTasks = useMemo(() => tasks.filter((t) => t.assignedTo === userId), [tasks, userId]);
+  const [detail, setDetail] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const myTasks = useMemo(() => tasks.filter((t) => t.assignedTo === employeeId), [tasks, employeeId]);
 
   const filtered = useMemo(() => {
-    return myTasks.filter((t) => {
+    const list = myTasks.filter((t) => {
       const ms = t.name.toLowerCase().includes(search.toLowerCase());
       const mst = status === "all" || t.status === status;
       const mp = priority === "all" || t.priority === priority;
       return ms && mst && mp;
     });
-  }, [myTasks, search, status, priority]);
+    return sortTasks(list, sort);
+  }, [myTasks, search, status, priority, sort]);
 
-  const total = myTasks.length;
-  const completed = myTasks.filter((t) => t.status === "Completed").length;
-  const pending = myTasks.filter((t) => t.status === "Pending").length;
-  const blocked = myTasks.filter((t) => t.status === "Blocked").length;
-  const performance = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-  const overdue = myTasks.filter(
-    (t) => t.status !== "Completed" && new Date(t.dueDate) < new Date(new Date().toDateString())
-  );
+  const perf = calculatePerformance(myTasks);
+  const overdue = myTasks.filter(isTaskOverdue);
+  const liveDetail = detail ? tasks.find((t) => t.id === detail.id) ?? null : null;
 
   return (
     <div className="space-y-8">
@@ -48,29 +61,19 @@ export default function EmployeeDashboard() {
         title="Stay in flow. Ship great work today."
         subtitle="Your assigned tasks, sorted by what matters most. Update status as you progress to keep your team in sync."
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">Viewing as</span>
-          <Select value={userId} onValueChange={setUserId}>
-            <SelectTrigger className="w-56 bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {USERS.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.name} · {u.role}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Button variant="outline" onClick={() => { exportTasksCSV(myTasks, `${me.name.replace(/ /g, "-")}-tasks.csv`); toast.success("Exported your tasks"); }}>
+          <Download className="w-4 h-4 mr-2" /> Export my tasks
+        </Button>
       </HeroBanner>
 
-      {(pending > 0 || overdue.length > 0) && (
-        <div className="card-elevated p-4 flex items-start gap-3 border-l-4 border-l-status-pending">
-          <Bell className="w-5 h-5 text-status-pending mt-0.5" />
+      {(perf.total > 0 && (overdue.length > 0 || perf.total - perf.completed > 0)) && (
+        <div className="card-elevated p-4 flex items-start gap-3 border-l-4 border-l-status-pending animate-fade-in">
+          <Bell className="w-5 h-5 text-status-pending mt-0.5 shrink-0" />
           <div>
             <p className="font-semibold text-sm">
               {overdue.length > 0
                 ? `${overdue.length} overdue task${overdue.length > 1 ? "s" : ""} need attention`
-                : `${pending} pending task${pending > 1 ? "s" : ""} waiting to be picked up`}
+                : `${perf.total - perf.completed} open task${perf.total - perf.completed > 1 ? "s" : ""} on your plate`}
             </p>
             <p className="text-xs text-muted-foreground">
               Update statuses regularly so your team has accurate visibility.
@@ -80,26 +83,28 @@ export default function EmployeeDashboard() {
       )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="My tasks" value={total} hint={`${myTasks.filter(t => t.status === "In Progress").length} in progress`} icon={ListTodo} tone="primary" />
-        <StatCard label="Completed" value={completed} hint="Great job!" icon={CheckCircle2} tone="completed" />
-        <StatCard label="Pending" value={pending} hint="Pick one to start" icon={Clock} tone="pending" />
-        <StatCard label="Blocked" value={blocked} hint="Resolve blockers" icon={AlertOctagon} tone="blocked" />
+        <StatCard label="My tasks" value={perf.total} hint={`${perf.inProgress} in progress`} icon={ListTodo} tone="primary" />
+        <StatCard label="Completed" value={perf.completed} hint="Great job!" icon={CheckCircle2} tone="completed" />
+        <StatCard label="Pending" value={myTasks.filter((t) => t.status === "Pending").length} hint="Pick one to start" icon={Clock} tone="pending" />
+        <StatCard label="Overdue" value={overdue.length} hint="Resolve soon" icon={AlertOctagon} tone="blocked" />
       </section>
 
       <section className="card-elevated p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
-            <h3 className="font-display text-lg font-semibold">My performance</h3>
-            <p className="text-xs text-muted-foreground">Completed vs. assigned</p>
+            <h3 className="font-display text-lg font-semibold">Performance score</h3>
+            <p className="text-xs text-muted-foreground">Weighted by completion, priority and overdue penalties</p>
           </div>
-          <span className="font-display text-2xl font-bold text-primary">{performance}%</span>
+          <span className={`font-display text-3xl font-bold ${perf.score >= 70 ? "text-status-completed" : perf.score >= 40 ? "text-primary" : "text-status-pending"}`}>
+            {perf.score}%
+          </span>
         </div>
-        <ProgressBar value={performance} tone={performance >= 70 ? "completed" : "primary"} />
+        <ProgressBar value={perf.score} tone={perf.score >= 70 ? "completed" : "primary"} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 text-sm">
-          <div><p className="text-muted-foreground text-xs">Completed</p><p className="font-semibold">{completed}</p></div>
-          <div><p className="text-muted-foreground text-xs">In progress</p><p className="font-semibold">{myTasks.filter(t => t.status === "In Progress").length}</p></div>
-          <div><p className="text-muted-foreground text-xs">Pending</p><p className="font-semibold">{pending}</p></div>
-          <div><p className="text-muted-foreground text-xs">Blocked</p><p className="font-semibold">{blocked}</p></div>
+          <Stat label="Completed" value={perf.completed} />
+          <Stat label="In progress" value={perf.inProgress} />
+          <Stat label="Pending" value={myTasks.filter((t) => t.status === "Pending").length} />
+          <Stat label="Overdue" value={overdue.length} tone="destructive" />
         </div>
       </section>
 
@@ -110,6 +115,7 @@ export default function EmployeeDashboard() {
           status={status} setStatus={setStatus}
           priority={priority} setPriority={setPriority}
           showUserFilter={false}
+          sort={sort} setSort={setSort}
         />
 
         {filtered.length === 0 ? (
@@ -123,13 +129,31 @@ export default function EmployeeDashboard() {
           <TaskTable
             tasks={filtered}
             showAssignee={false}
+            onRowClick={(t) => { setDetail(t); setDetailOpen(true); }}
             onStatusChange={(id, s) => {
-              updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any });
+              updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any }, employeeId);
               toast.success(`Status updated to ${s}`);
             }}
           />
         )}
       </section>
+
+      <TaskDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        task={liveDetail}
+        currentUserId={employeeId}
+        onAddComment={(id, msg, author) => { addComment(id, msg, author); toast.success("Comment added"); }}
+      />
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone?: "destructive" }) {
+  return (
+    <div>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className={`font-semibold text-lg ${tone === "destructive" ? "text-destructive" : ""}`}>{value}</p>
     </div>
   );
 }
