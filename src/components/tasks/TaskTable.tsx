@@ -1,10 +1,11 @@
-import { Pencil, Trash2, CalendarDays, MessageSquare } from "lucide-react";
+import { Pencil, Trash2, CalendarDays, MessageSquare, Lock } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import PriorityBadge from "./PriorityBadge";
 import UserAvatar from "./UserAvatar";
 import ProgressBar from "./ProgressBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { STATUSES, type Task, type TaskStatus } from "@/types/task";
+import { type Task, type TaskStatus } from "@/types/task";
+import { isLocked, nextStatuses } from "@/lib/workflow";
 
 interface Props {
   tasks: Task[];
@@ -74,15 +75,18 @@ export default function TaskTable({
                   </td>
                   <td className="px-5 py-4"><PriorityBadge priority={t.priority} /></td>
                   <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                    {onStatusChange ? (
+                    {onStatusChange && !isLocked(t.status) ? (
                       <Select value={t.status} onValueChange={(v) => onStatusChange(t.id, v as TaskStatus)}>
                         <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          {nextStatuses(t.status).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <StatusBadge status={t.status} />
+                      <span className="inline-flex items-center gap-1.5">
+                        <StatusBadge status={t.status} />
+                        {isLocked(t.status) && <Lock className="w-3 h-3 text-muted-foreground" aria-label="Locked" />}
+                      </span>
                     )}
                   </td>
                   {showAssignee && (
