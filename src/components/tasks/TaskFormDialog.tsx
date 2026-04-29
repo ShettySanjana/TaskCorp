@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CATEGORIES, PRIORITIES, STATUSES, type Task } from "@/types/task";
+import { CATEGORIES, PRIORITIES, type Task } from "@/types/task";
 import { USERS } from "@/data/users";
+import { nextStatuses } from "@/lib/workflow";
 
 interface Props {
   open: boolean;
@@ -100,10 +101,16 @@ export default function TaskFormDialog({ open, onOpenChange, initial, onSubmit }
 
             <div>
               <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v as Task["status"] }))}>
+              <Select
+                value={form.status}
+                onValueChange={(v) => setForm((p) => ({ ...p, status: v as Task["status"] }))}
+                disabled={initial?.status === "Completed"}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
+                  {(initial ? nextStatuses(initial.status) : (["Pending"] as Task["status"][])).map((x) => (
+                    <SelectItem key={x} value={x}>{x}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
