@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, ListTodo, CheckCircle2, Clock, AlertOctagon, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTasks } from "@/hooks/useTasks";
+import { useScopedTasks } from "@/hooks/useScopedTasks";
 import HeroBanner from "@/components/dashboard/HeroBanner";
 import StatCard from "@/components/dashboard/StatCard";
 import AnalyticsCharts from "@/components/dashboard/AnalyticsCharts";
@@ -11,16 +11,15 @@ import TaskFormDialog from "@/components/tasks/TaskFormDialog";
 import TaskDetailDialog from "@/components/tasks/TaskDetailDialog";
 import EmptyState from "@/components/tasks/EmptyState";
 import { USERS } from "@/data/users";
-import { useCurrentUser } from "@/context/CurrentUserContext";
-import { calculatePerformance } from "@/lib/scoring";
+import { calculatePerformance, isTaskOverdue } from "@/lib/scoring";
 import { sortTasks } from "@/lib/sort";
+import { canTransition } from "@/lib/workflow";
 import { exportTasksCSV, exportTasksPDF } from "@/lib/export";
-import type { Task } from "@/types/task";
+import type { Task, TaskStatus } from "@/types/task";
 import { toast } from "sonner";
 
 export default function AdminDashboard() {
-  const { tasks, addTask, updateTask, deleteTask, addComment } = useTasks();
-  const { currentUserId } = useCurrentUser();
+  const { tasks, addTask, updateTask, deleteTask, addComment, currentUserId } = useScopedTasks();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
 
