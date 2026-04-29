@@ -18,6 +18,7 @@ export default function NotificationsPanel() {
   );
 
   const overdue = visible.filter(isTaskOverdue);
+  const blocked = visible.filter((t) => t.status === "Blocked");
   const recentlyCompleted = visible
     .filter((t) => t.status === "Completed")
     .slice(0, 3);
@@ -26,7 +27,11 @@ export default function NotificationsPanel() {
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 3);
 
-  const total = overdue.length + recentlyCompleted.length + newlyAssigned.length;
+  const adminAlerts = isAdmin && blocked.length >= 1
+    ? [{ id: "sys-blocked", title: `${blocked.length} task${blocked.length > 1 ? "s" : ""} currently blocked`, meta: "Action needed to unblock the team" }]
+    : [];
+
+  const total = overdue.length + recentlyCompleted.length + newlyAssigned.length + adminAlerts.length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
