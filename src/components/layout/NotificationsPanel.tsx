@@ -55,6 +55,15 @@ export default function NotificationsPanel() {
         </div>
         <ScrollArea className="h-80">
           <div className="p-2 space-y-1">
+            {adminAlerts.map((a) => (
+              <NotificationItem
+                key={a.id}
+                tone="destructive"
+                icon={<AlertOctagon className="w-4 h-4" />}
+                title={a.title}
+                meta={a.meta}
+              />
+            ))}
             {overdue.map((t) => (
               <NotificationItem
                 key={`o-${t.id}`}
