@@ -18,6 +18,7 @@ export default function NotificationsPanel() {
   );
 
   const overdue = visible.filter(isTaskOverdue);
+  const blocked = visible.filter((t) => t.status === "Blocked");
   const recentlyCompleted = visible
     .filter((t) => t.status === "Completed")
     .slice(0, 3);
@@ -26,7 +27,11 @@ export default function NotificationsPanel() {
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 3);
 
-  const total = overdue.length + recentlyCompleted.length + newlyAssigned.length;
+  const adminAlerts = isAdmin && blocked.length >= 1
+    ? [{ id: "sys-blocked", title: `${blocked.length} task${blocked.length > 1 ? "s" : ""} currently blocked`, meta: "Action needed to unblock the team" }]
+    : [];
+
+  const total = overdue.length + recentlyCompleted.length + newlyAssigned.length + adminAlerts.length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -50,6 +55,15 @@ export default function NotificationsPanel() {
         </div>
         <ScrollArea className="h-80">
           <div className="p-2 space-y-1">
+            {adminAlerts.map((a) => (
+              <NotificationItem
+                key={a.id}
+                tone="destructive"
+                icon={<AlertOctagon className="w-4 h-4" />}
+                title={a.title}
+                meta={a.meta}
+              />
+            ))}
             {overdue.map((t) => (
               <NotificationItem
                 key={`o-${t.id}`}

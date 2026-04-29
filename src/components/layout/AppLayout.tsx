@@ -1,18 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, UserRound, ListChecks, CalendarDays, Moon, Sun, Sparkles } from "lucide-react";
+import { LayoutDashboard, UserRound, ListChecks, CalendarDays, Activity, Moon, Sun, Sparkles, ShieldCheck } from "lucide-react";
 import NotificationsPanel from "./NotificationsPanel";
 import UserSwitcher from "./UserSwitcher";
+import { useCurrentUser, getIdentity } from "@/context/CurrentUserContext";
 
-const navItems = [
+const ADMIN_NAV = [
   { to: "/", label: "Admin", icon: LayoutDashboard, end: true },
-  { to: "/employee", label: "Employee", icon: UserRound },
   { to: "/tasks", label: "All Tasks", icon: ListChecks },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/activity", label: "Activity", icon: Activity },
+];
+const EMPLOYEE_NAV = [
+  { to: "/employee", label: "My Dashboard", icon: UserRound, end: true },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 export default function AppLayout() {
   const [dark, setDark] = useState<boolean>(() => localStorage.getItem("taskcorp.theme") === "dark");
+  const { isAdmin, currentUserId } = useCurrentUser();
+  const identity = getIdentity(currentUserId);
+  const navItems = useMemo(() => (isAdmin ? ADMIN_NAV : EMPLOYEE_NAV), [isAdmin]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -55,11 +63,20 @@ export default function AppLayout() {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">
-          <div className="rounded-lg bg-sidebar-accent/40 p-4">
-            <p className="text-xs text-sidebar-foreground/80">Productivity tip</p>
-            <p className="text-sm font-medium text-sidebar-accent-foreground mt-1">
-              Review overdue tasks at the start of every day.
-            </p>
+          <div className="rounded-lg bg-sidebar-accent/40 p-4 flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+              style={{ background: `hsl(${identity.color})` }}
+            >
+              {identity.initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-sidebar-accent-foreground truncate">{identity.name}</p>
+              <p className="text-[10px] text-sidebar-foreground/80 inline-flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                {isAdmin ? "Administrator" : "Employee"}
+              </p>
+            </div>
           </div>
         </div>
       </aside>

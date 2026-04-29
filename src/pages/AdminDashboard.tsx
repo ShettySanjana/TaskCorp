@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, ListTodo, CheckCircle2, Clock, AlertOctagon, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTasks } from "@/hooks/useTasks";
+import { useScopedTasks } from "@/hooks/useScopedTasks";
 import HeroBanner from "@/components/dashboard/HeroBanner";
 import StatCard from "@/components/dashboard/StatCard";
 import AnalyticsCharts from "@/components/dashboard/AnalyticsCharts";
@@ -11,16 +11,15 @@ import TaskFormDialog from "@/components/tasks/TaskFormDialog";
 import TaskDetailDialog from "@/components/tasks/TaskDetailDialog";
 import EmptyState from "@/components/tasks/EmptyState";
 import { USERS } from "@/data/users";
-import { useCurrentUser } from "@/context/CurrentUserContext";
-import { calculatePerformance } from "@/lib/scoring";
+import { calculatePerformance, isTaskOverdue } from "@/lib/scoring";
 import { sortTasks } from "@/lib/sort";
+import { canTransition } from "@/lib/workflow";
 import { exportTasksCSV, exportTasksPDF } from "@/lib/export";
-import type { Task } from "@/types/task";
+import type { Task, TaskStatus } from "@/types/task";
 import { toast } from "sonner";
 
 export default function AdminDashboard() {
-  const { tasks, addTask, updateTask, deleteTask, addComment } = useTasks();
-  const { currentUserId } = useCurrentUser();
+  const { tasks, addTask, updateTask, deleteTask, addComment, currentUserId } = useScopedTasks();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
 
@@ -168,13 +167,46 @@ export default function AdminDashboard() {
             tasks={filtered}
             onEdit={openEdit}
             onRowClick={(t) => { setDetail(t); setDetailOpen(true); }}
-            onDelete={(id) => { deleteTask(id); toast.success("Task deleted"); }}
+            onDelete={(id) => { deleteTask(id, currentUserId); toast.success("Task deleted"); }}
             onStatusChange={(id, s) => {
+              const target = tasks.find((x) => x.id === id);
+              if (!target) return;
+              if (!canTransition(target.status, s as TaskStatus)) {
+                toast.error(`Cannot move task from ${target.status} to ${s}`);
+                return;
+              }
               updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any }, currentUserId);
               toast.success(`Status updated to ${s}`);
             }}
           />
         )}
+      </section>
+
+      <section className="card-elevated p-6">
+        <h3 className="font-display text-lg font-semibold mb-1">Overdue by team member</h3>
+        <p className="text-xs text-muted-foreground mb-4">Actionable signal for follow-ups and re-prioritisation.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {USERS.map((u) => {
+            const overdueCount = tasks.filter((t) => t.assignedTo === u.id && isTaskOverdue(t)).length;
+            return (
+              <div key={u.id} className={`flex items-center gap-3 p-3 rounded-lg border ${overdueCount > 0 ? "border-destructive/40 bg-destructive/5" : "border-border"}`}>
+                <div
+                  className="w-8 h-8 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+                  style={{ background: `hsl(${u.color})` }}
+                >
+                  {u.initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{u.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{u.role}</p>
+                </div>
+                <span className={`font-display font-bold ${overdueCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {overdueCount}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <TaskFormDialog open={open} onOpenChange={setOpen} initial={editing} onSubmit={handleSubmit} />

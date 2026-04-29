@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Task, TaskComment, TaskHistoryEntry } from "@/types/task";
+import { appendAudit } from "@/lib/audit";
 
 const STORAGE_KEY = "taskcorp.tasks.v2";
 
@@ -112,22 +113,40 @@ const seed = (): Task[] => {
 
 const TRACKED_FIELDS: (keyof Task)[] = ["status", "priority", "assignedTo", "dueDate", "progress", "name"];
 
+// Cross-tab + cross-hook synchronisation so every consumer of useTasks sees
+// the same data without wiring a global context.
+const TASK_EVENT = "taskcorp:tasks";
+const broadcast = () => window.dispatchEvent(new CustomEvent(TASK_EVENT));
+
+const readTasks = (): Task[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as Task[];
+  } catch {
+    /* noop */
+  }
+  const initial = seed();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+  return initial;
+};
+
+const persist = (next: Task[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  broadcast();
+};
+
 export function useTasks() {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as Task[];
-    } catch {
-      /* noop */
-    }
-    const initial = seed();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
-  });
+  const [tasks, setTasks] = useState<Task[]>(() => readTasks());
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
+    const refresh = () => setTasks(readTasks());
+    window.addEventListener(TASK_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(TASK_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
   const addTask = useCallback(
     (task: Omit<Task, "id" | "createdAt">, authorId = "admin") => {
@@ -147,7 +166,20 @@ export function useTasks() {
           },
         ],
       };
-      setTasks((prev) => [newTask, ...prev]);
+      setTasks((prev) => {
+        const next = [newTask, ...prev];
+        persist(next);
+        return next;
+      });
+      appendAudit({
+        action: "create",
+        taskId: id,
+        taskName: newTask.name,
+        authorId,
+        field: "created",
+        to: newTask.assignedTo,
+        note: `Created task "${newTask.name}"`,
+      });
       return newTask;
     },
     [],
@@ -155,31 +187,58 @@ export function useTasks() {
 
   const updateTask = useCallback(
     (id: string, patch: Partial<Task>, authorId = "admin") => {
-      setTasks((prev) =>
-        prev.map((t) => {
+      setTasks((prev) => {
+        const next = prev.map((t) => {
           if (t.id !== id) return t;
           const newHistory: TaskHistoryEntry[] = [...(t.history ?? [])];
           for (const field of TRACKED_FIELDS) {
             if (patch[field] !== undefined && patch[field] !== t[field]) {
-              newHistory.push({
+              const entry: TaskHistoryEntry = {
                 id: uid(),
                 authorId,
                 field: String(field),
                 from: String(t[field] ?? ""),
                 to: String(patch[field] ?? ""),
                 createdAt: new Date().toISOString(),
+              };
+              newHistory.push(entry);
+              appendAudit({
+                action: field === "status" ? "status" : "update",
+                taskId: t.id,
+                taskName: t.name,
+                authorId,
+                field: String(field),
+                from: entry.from,
+                to: entry.to,
               });
             }
           }
           return { ...t, ...patch, history: newHistory };
-        }),
-      );
+        });
+        persist(next);
+        return next;
+      });
     },
     [],
   );
 
-  const deleteTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  const deleteTask = useCallback((id: string, authorId = "admin") => {
+    setTasks((prev) => {
+      const target = prev.find((t) => t.id === id);
+      const next = prev.filter((t) => t.id !== id);
+      persist(next);
+      if (target) {
+        appendAudit({
+          action: "delete",
+          taskId: id,
+          taskName: target.name,
+          authorId,
+          field: "deleted",
+          note: `Deleted task "${target.name}"`,
+        });
+      }
+      return next;
+    });
   }, []);
 
   const addComment = useCallback(
@@ -190,8 +249,8 @@ export function useTasks() {
         message,
         createdAt: new Date().toISOString(),
       };
-      setTasks((prev) =>
-        prev.map((t) =>
+      setTasks((prev) => {
+        const next = prev.map((t) =>
           t.id === taskId
             ? {
                 ...t,
@@ -208,10 +267,21 @@ export function useTasks() {
                 ],
               }
             : t,
-        ),
-      );
+        );
+        persist(next);
+        return next;
+      });
+      const target = tasks.find((t) => t.id === taskId);
+      appendAudit({
+        action: "comment",
+        taskId,
+        taskName: target?.name,
+        authorId,
+        field: "comment",
+        note: message.slice(0, 120),
+      });
     },
-    [],
+    [tasks],
   );
 
   return { tasks, addTask, updateTask, deleteTask, addComment };
