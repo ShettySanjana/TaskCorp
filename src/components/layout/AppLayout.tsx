@@ -63,11 +63,20 @@ export default function AppLayout() {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">
-          <div className="rounded-lg bg-sidebar-accent/40 p-4">
-            <p className="text-xs text-sidebar-foreground/80">Productivity tip</p>
-            <p className="text-sm font-medium text-sidebar-accent-foreground mt-1">
-              Review overdue tasks at the start of every day.
-            </p>
+          <div className="rounded-lg bg-sidebar-accent/40 p-4 flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shrink-0"
+              style={{ background: `hsl(${identity.color})` }}
+            >
+              {identity.initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-sidebar-accent-foreground truncate">{identity.name}</p>
+              <p className="text-[10px] text-sidebar-foreground/80 inline-flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                {isAdmin ? "Administrator" : "Employee"}
+              </p>
+            </div>
           </div>
         </div>
       </aside>
