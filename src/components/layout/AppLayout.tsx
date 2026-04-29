@@ -1,18 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, UserRound, ListChecks, CalendarDays, Moon, Sun, Sparkles } from "lucide-react";
+import { LayoutDashboard, UserRound, ListChecks, CalendarDays, Activity, Moon, Sun, Sparkles, ShieldCheck } from "lucide-react";
 import NotificationsPanel from "./NotificationsPanel";
 import UserSwitcher from "./UserSwitcher";
+import { useCurrentUser, getIdentity } from "@/context/CurrentUserContext";
 
-const navItems = [
+const ADMIN_NAV = [
   { to: "/", label: "Admin", icon: LayoutDashboard, end: true },
-  { to: "/employee", label: "Employee", icon: UserRound },
   { to: "/tasks", label: "All Tasks", icon: ListChecks },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/activity", label: "Activity", icon: Activity },
+];
+const EMPLOYEE_NAV = [
+  { to: "/employee", label: "My Dashboard", icon: UserRound, end: true },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 export default function AppLayout() {
   const [dark, setDark] = useState<boolean>(() => localStorage.getItem("taskcorp.theme") === "dark");
+  const { isAdmin, currentUserId } = useCurrentUser();
+  const identity = getIdentity(currentUserId);
+  const navItems = useMemo(() => (isAdmin ? ADMIN_NAV : EMPLOYEE_NAV), [isAdmin]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
