@@ -9,8 +9,9 @@ import TaskDetailDialog from "@/components/tasks/TaskDetailDialog";
 import EmptyState from "@/components/tasks/EmptyState";
 import { useCurrentUser } from "@/context/CurrentUserContext";
 import { sortTasks } from "@/lib/sort";
+import { canTransition } from "@/lib/workflow";
 import { exportTasksCSV, exportTasksPDF } from "@/lib/export";
-import type { Task } from "@/types/task";
+import type { Task, TaskStatus } from "@/types/task";
 import { toast } from "sonner";
 
 export default function AllTasks() {
@@ -90,8 +91,14 @@ export default function AllTasks() {
           tasks={filtered}
           onEdit={(t) => { setEditing(t); setOpen(true); }}
           onRowClick={(t) => { setDetail(t); setDetailOpen(true); }}
-          onDelete={(id) => { deleteTask(id); toast.success("Task deleted"); }}
+          onDelete={(id) => { deleteTask(id, currentUserId); toast.success("Task deleted"); }}
           onStatusChange={(id, s) => {
+            const target = tasks.find((x) => x.id === id);
+            if (!target) return;
+            if (!canTransition(target.status, s as TaskStatus)) {
+              toast.error(`Cannot move task from ${target.status} to ${s}`);
+              return;
+            }
             updateTask(id, { status: s, progress: s === "Completed" ? 100 : undefined as any }, currentUserId);
             toast.success(`Status updated to ${s}`);
           }}
